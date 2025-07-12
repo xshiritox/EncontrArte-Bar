@@ -1,61 +1,23 @@
 [build]
-  command = "npm run build"
-  publish = "dist"
+command = "npm run build"
+publish = "dist"
 
 [build.environment]
-  NODE_VERSION = "18"
+NODE_VERSION = "18"
 
 [headers]
-  "/"
-    X-Frame-Options = "DENY"
-    X-Content-Type-Options = "nosniff"
-    X-XSS-Protection = "1; mode=block"
-    Referrer-Policy = "strict-origin-when-cross-origin"
+"/" = {
+  X-Frame-Options = "DENY",
+  X-Content-Type-Options = "nosniff",
+  X-XSS-Protection = "1; mode=block",
+  Referrer-Policy = "strict-origin-when-cross-origin"
+}
 
 [headers "/index.html"]
-  Content-Type = "text/html"
+Content-Type = "text/html"
 
 [headers "/assets/*.js"]
-  Content-Type = "application/javascript"
+Content-Type = "application/javascript"
 
 [headers "/assets/*.css"]
-  Content-Type = "text/css"
-
-[headers "/assets/*.svg"]
-  Content-Type = "image/svg+xml"
-
-[headers "/assets/*.png"]
-  Content-Type = "image/png"
-
-[headers "/assets/*.jpg"]
-  Content-Type = "image/jpeg"
-
-[headers "/assets/*.jpeg"]
-  Content-Type = "image/jpeg"
-
-[headers "/assets/*.gif"]
-  Content-Type = "image/gif"
-
-[headers "/assets/*.webp"]
-  Content-Type = "image/webp"
-
-[headers "/assets/*.ico"]
-  Content-Type = "image/x-icon"
-
-[headers "/assets/*.woff"]
-  Content-Type = "font/woff"
-
-[headers "/assets/*.woff2"]
-  Content-Type = "font/woff2"
-
-[headers "/assets/*.ttf"]
-  Content-Type = "font/ttf"
-
-[headers "/assets/*.otf"]
-  Content-Type = "font/otf"
-
-[headers "/assets/*.eot"]
-  Content-Type = "application/vnd.ms-fontobject"
-
-[headers "/assets/*.json"]
-  Content-Type = "application/json"
+Content-Type = "text/css"

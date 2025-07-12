@@ -107,7 +107,7 @@ onMounted(() => {
 
 <style scoped>
 .menu-section {
-  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #f1f5f9 100%);
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
   position: relative;
   overflow: hidden;
 }
@@ -119,14 +119,14 @@ onMounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="15" cy="15" r="2" fill="rgba(251,191,36,0.2)"/><circle cx="85" cy="25" r="1.5" fill="rgba(16,185,129,0.2)"/><circle cx="65" cy="85" r="2.5" fill="rgba(249,115,22,0.2)"/><circle cx="25" cy="75" r="1.8" fill="rgba(59,130,246,0.2)"/></svg>');
-  background-size: 120px 120px;
-  animation: floatingElements 25s linear infinite;
+  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M10,10 C20,5 30,15 40,10 C50,5 60,15 70,10 C80,5 90,15 100,10" stroke="rgba(251,191,36,0.1)" stroke-width="2" fill="none"/><path d="M0,30 C10,25 20,35 30,30 C40,25 50,35 60,30 C70,25 80,35 90,30" stroke="rgba(16,185,129,0.1)" stroke-width="2" fill="none"/></svg>');
+  background-size: 200px 200px;
+  animation: waveMove 15s ease-in-out infinite;
 }
 
-@keyframes floatingElements {
-  0% { transform: translateX(0) translateY(0); }
-  100% { transform: translateX(-120px) translateY(-120px); }
+@keyframes waveMove {
+  0%, 100% { transform: translateX(0) translateY(0); }
+  50% { transform: translateX(-50px) translateY(-30px); }
 }
 
 .section-header {

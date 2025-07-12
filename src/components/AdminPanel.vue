@@ -67,14 +67,20 @@
             </div>
             
             <div class="form-group">
-              <label for="image_url">URL de la Imagen</label>
+              <label for="image">Imagen del Producto</label>
               <input
-                id="image_url"
-                v-model="formData.image_url"
-                type="url"
+                id="image"
+                type="file"
+                accept="image/*"
                 class="form-input"
-                placeholder="https://ejemplo.com/imagen.jpg"
+                @change="handleImageChange"
               />
+              <div v-if="formData.image" class="preview-image">
+                <img :src="previewImage" alt="Preview" />
+                <button @click="clearImage" class="clear-image-btn">
+                  <font-awesome-icon :icon="['fas', 'times']" />
+                </button>
+              </div>
             </div>
             
             <div v-if="formError" class="error-message">
@@ -122,7 +128,11 @@
         <div v-else class="products-grid">
           <div v-for="item in menuItems" :key="item.id" class="product-card">
             <div class="product-image">
-              <img :src="item.image_url || defaultImage" :alt="item.name" @error="handleImageError" />
+              <img v-if="item.image_url" :src="item.image_url" :alt="item.name" @error="handleImageError" />
+              <div v-else class="no-image-placeholder">
+                <font-awesome-icon :icon="['fas', 'images']" class="no-image-icon" />
+                <span>No hay imagen</span>
+              </div>
             </div>
             <div class="product-info">
               <h3>{{ item.name }}</h3>
@@ -150,9 +160,9 @@ import { supabase } from '../lib/supabase'
 import type { MenuItem } from '../types/menu'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { library } from '@fortawesome/fontawesome-svg-core'
-import { faPlus, faSignOutAlt, faTimes, faSpinner, faCoffee, faEdit, faTrash } from '@fortawesome/free-solid-svg-icons'
+import { faPlus, faSignOutAlt, faTimes, faSpinner, faCoffee, faEdit, faTrash, faImages } from '@fortawesome/free-solid-svg-icons'
 
-library.add(faPlus, faSignOutAlt, faTimes, faSpinner, faCoffee, faEdit, faTrash)
+library.add(faPlus, faSignOutAlt, faTimes, faSpinner, faCoffee, faEdit, faTrash, faImages)
 
 const emit = defineEmits(['logout'])
 
@@ -165,19 +175,52 @@ const formError = ref('')
 
 const defaultImage = 'https://images.pexels.com/photos/312418/pexels-photo-312418.jpeg?auto=compress&cs=tinysrgb&w=400'
 
-const formData = reactive({
+interface FormData {
+  name: string;
+  description: string;
+  price: number;
+  image: File | null;
+}
+
+const formData = reactive<FormData>({
   name: '',
   description: '',
   price: 0,
-  image_url: ''
+  image: null
 })
+
+const previewImage = ref('')
 
 const resetForm = () => {
   formData.name = ''
   formData.description = ''
   formData.price = 0
-  formData.image_url = ''
+  formData.image = null
+  previewImage.value = ''
   formError.value = ''
+}
+
+const handleImageChange = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  
+  if (file) {
+    formData.image = file
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      previewImage.value = e.target?.result as string
+    }
+    reader.readAsDataURL(file)
+  }
+}
+
+const clearImage = () => {
+  formData.image = null
+  previewImage.value = ''
+  const input = document.getElementById('image') as HTMLInputElement
+  if (input) {
+    input.value = ''
+  }
 }
 
 const closeForm = () => {
@@ -208,11 +251,33 @@ const saveProduct = async () => {
     saving.value = true
     formError.value = ''
     
+    let imageUrl = null
+    if (formData.image) {
+      // Subir la imagen a Supabase Storage
+      const file = formData.image
+      const fileName = `${Date.now()}-${file.name}`
+      
+      const { error: storageError } = await supabase
+        .storage
+        .from('menu-images')
+        .upload(fileName, file)
+      
+      if (storageError) throw storageError
+      
+      // Obtener la URL pública de la imagen
+      const { data } = await supabase
+        .storage
+        .from('menu-images')
+        .getPublicUrl(fileName)
+      
+      imageUrl = data.publicUrl
+    }
+    
     const productData = {
       name: formData.name,
       description: formData.description,
       price: Number(formData.price),
-      image_url: formData.image_url || null
+      image_url: imageUrl || null
     }
     
     if (editingItem.value) {
@@ -246,25 +311,64 @@ const editProduct = (item: MenuItem) => {
   formData.name = item.name
   formData.description = item.description
   formData.price = Number(item.price)
-  formData.image_url = item.image_url || ''
+  // No necesitamos setear image_url ya que usamos image en formData
 }
 
 const deleteProduct = async (item: MenuItem) => {
   if (!confirm(`¿Estás seguro de que quieres eliminar "${item.name}"?`)) {
-    return
+    return;
   }
-  
+
   try {
-    const { error } = await supabase
+    console.log('Iniciando eliminación de producto:', item.id);
+    
+    // Si el producto tiene imagen
+    if (item.image_url) {
+      try {
+        console.log('URL de la imagen:', item.image_url);
+        
+        // Extraer el nombre del archivo de la URL
+        const urlParts = new URL(item.image_url);
+        const fileName = urlParts.pathname.split('/').pop();
+        console.log('Nombre del archivo:', fileName);
+        
+        if (fileName) {
+          // Intentar eliminar la imagen
+          const { error: storageError } = await supabase
+            .storage
+            .from('menu-images')
+            .remove([fileName]);
+          
+          if (storageError) {
+            console.error('Error al eliminar imagen:', storageError);
+            throw new Error(`Error al eliminar imagen: ${storageError.message}`);
+          }
+          
+          console.log('Imagen eliminada exitosamente');
+        }
+      } catch (imageError) {
+        console.error('Error en bloque de imagen:', imageError);
+        throw imageError;
+      }
+    }
+
+    // Eliminar el producto
+    const { error: deleteError } = await supabase
       .from('menu_items')
       .delete()
-      .eq('id', item.id)
+      .eq('id', item.id);
     
-    if (error) throw error
-    await fetchMenuItems()
-  } catch (error) {
-    console.error('Error deleting product:', error)
-    alert('Error al eliminar el producto')
+    if (deleteError) {
+      console.error('Error al eliminar producto:', deleteError);
+      throw new Error(`Error al eliminar producto: ${deleteError.message}`);
+    }
+    
+    console.log('Producto eliminado exitosamente');
+    await fetchMenuItems();
+    alert('Producto eliminado exitosamente');
+  } catch (error: any) {
+    console.error('Error total:', error);
+    alert(`Error: ${error.message}`);
   }
 }
 
@@ -285,15 +389,36 @@ onMounted(() => {
 
 <style scoped>
 .admin-panel {
-  min-height: 100vh;
+  height: 100vh;
   background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  overflow-y: auto;
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+  padding: 0;
+}
+
+.admin-panel::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}
+
+.admin-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  flex: 1;
 }
 
 .admin-header {
   background: linear-gradient(135deg, #1e3a8a, #3b82f6);
   color: white;
-  padding: 2rem 0;
+  padding: 1rem 0;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .header-content {
@@ -321,6 +446,9 @@ onMounted(() => {
   max-width: 1200px;
   margin: 0 auto;
   padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
 }
 
 .product-form-overlay {
@@ -394,6 +522,35 @@ onMounted(() => {
 .form-group label {
   font-weight: 600;
   color: #1e3a8a;
+}
+
+.preview-image {
+  position: relative;
+  margin-top: 1rem;
+}
+
+.preview-image img {
+  max-width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+  border-radius: 10px;
+  background: white;
+}
+
+.clear-image-btn {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  background: white;
+  border: none;
+  border-radius: 50%;
+  padding: 5px;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.clear-image-btn:hover {
+  background: #f8fafc;
 }
 
 .form-input {
@@ -478,6 +635,40 @@ onMounted(() => {
 .product-image {
   height: 200px;
   overflow: hidden;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.no-image-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  color: #64748b;
+  background: #f8fafc;
+  width: 100%;
+  height: 100%;
+  border-radius: 15px;
+  font-size: 1.1rem;
+  padding: 2rem;
+}
+
+.no-image-placeholder .fa-image-slash {
+  font-size: 4rem;
+  color: #94a3b8;
+}
+
+.no-image-placeholder span {
+  font-size: 1.2rem;
+  font-weight: 500;
+}
+
+.no-image-icon {
+  font-size: 3rem;
+  color: #94a3b8;
 }
 
 .product-image img {
